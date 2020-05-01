@@ -57,6 +57,7 @@ if __name__ == "__main__":
             dev_login = data[dev].get("login")
             dev_pwd = getpass.getpass(f"{dev_login}'s password on {dev}: ")
 
+        # Now, we create a dictionary for netmiko library
         device_params = {
             "device_type": get_platform_by_hostname(dev),
             "host": dev + def_domain,
