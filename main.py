@@ -70,25 +70,31 @@ if __name__ == "__main__":
         try:
             with ConnectHandler(**device_params) as ssh:
                 for cmd in data[dev]["cmds"]:
-                    print(f"{cmd}\n")
+                    print(f"{cmd}")
                     res = ssh.send_command_timing(cmd)
                     print(f"{res}\n")
 
         except Exception as err:
             # logging.warning(f"SSH failed with {err}")
             logging.warning("SSH failed, trying Telnet")
-            with telnetlib.Telnet(device_params["host"]) as tn:
-                #Logging in
-                tn.read_until(b":",timeout=3)
-                tn.write(dev_login.encode("ascii") + b'\n')
+            try:
+                with telnetlib.Telnet(device_params["host"]) as tn:
+                    #Logging in
+                    tn.read_until(b":",timeout=3)
+                    tn.write(dev_login.encode("ascii") + b'\n')
 
-                tn.read_until(b':', timeout=3)
-                tn.write(dev_pwd.encode("ascii") + b'\n')
-                tn.read_until(b'#', timeout=3)
+                    tn.read_until(b':', timeout=3)
+                    tn.write(dev_pwd.encode("ascii") + b'\n')
+                    auth_res = tn.read_until(b'#', timeout=3)
+                    if auth_res.decode("ascii").find(dev) == -1:
+                        raise ConnectionRefusedError(f"{auth_res.decode('ascii')}")
 
-                # Executing commands
-                for cmd in data[dev]["cmds"]:
-                    print(f"{cmd}\n")
-                    tn.write(cmd.encode("ascii") + b'\n')
-                    res = tn.read_until(b'#', timeout=3)
-                    print(f"{res.decode('ascii')}\n")
+                    # Executing commands
+                    print(f"Successfully logged into {dev} via Telnet")
+                    for cmd in data[dev]["cmds"]:
+                        tn.write(cmd.encode("ascii") + b'\n')
+                        res = tn.read_until(b'#', timeout=3)
+                        print(f"{res.decode('ascii')}\n")
+            except Exception as tn_err:
+                logging.warning(f"Auth failed, received:\n{tn_err}")
+                logging.warning(f"Telnet failed either, skipping {dev}")
