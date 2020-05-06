@@ -4,6 +4,7 @@ import argparse
 import logging
 import getpass
 import yaml
+import os
 
 
 def get_platform_by_hostname(hostname):
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     Third, it will read the file
     Fourth, it will exec the cmds on the devices
     '''
-    with open("config.yml") as f:
+    with open(os.path.dirname(__file__) + "/config.yml") as f:
         config = yaml.safe_load(f)
         def_domain = config["def_domain"]
 
