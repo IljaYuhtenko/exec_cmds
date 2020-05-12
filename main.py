@@ -56,7 +56,7 @@ if __name__ == "__main__":
             dev_pwd = pwd
         else:
             dev_login = data[dev].get("login")
-            dev_pwd = getpass.getpass(f"{dev_login}'s password on {dev}: ")
+            dev_pwd = getpass.getpass(f"{dev_login}'s password on {dev}:")
 
         # Now, we create a dictionary for netmiko library
         device_params = {
@@ -67,9 +67,15 @@ if __name__ == "__main__":
             "verbose": True
         }
 
+        if data[dev].get("enable"):
+            device_params["secret"] = getpass.getpass(f"{dev}'s enable password:")
+
         # First try, SSH
         try:
             with ConnectHandler(**device_params) as ssh:
+                if data[dev].get("enable"):
+                    logging.info(ssh.enable())
+
                 for cmd in data[dev]["cmds"]:
                     print(f"{cmd}")
                     res = ssh.send_command_timing(cmd)
@@ -92,6 +98,15 @@ if __name__ == "__main__":
 
                     # Executing commands
                     print(f"Successfully logged into {dev} via Telnet")
+                    if data[dev].get("enable"):
+                        logging.info("Trying enable mode")
+                        tn.write("enable".encode("ascii") + b'\n')
+                        res = tn.read_until(b'#', timeout=3)
+                        print(f"{res.decode('ascii')}\n")
+                        tn.write(device_params["secret"].encode("ascii") + b'\n')
+                        res = tn.read_until(b'#', timeout=3)
+                        print(f"{res.decode('ascii')}\n")
+
                     for cmd in data[dev]["cmds"]:
                         tn.write(cmd.encode("ascii") + b'\n')
                         res = tn.read_until(b'#', timeout=3)
