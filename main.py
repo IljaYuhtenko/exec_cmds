@@ -5,7 +5,7 @@ import logging
 import getpass
 import yaml
 import os
-
+import ipaddress
 
 def get_platform_by_hostname(hostname):
     dtype = hostname.split('-')[0]
@@ -17,7 +17,17 @@ def get_platform_by_hostname(hostname):
         return "cisco_ios"
     elif dtype == "mt":
         return "mikrotik_routeros"
+    else:
+        return "mikrotik_routeros"
 
+def get_full_hostname(dev, def_domain):
+    try:
+        addr = ipaddress.ip_address(dev)
+        logging.info(f"{dev} is an ip address")
+        return dev
+    except ValueError:
+        logging.info(f"{dev} is a hostname")
+        return dev + def_domain
 
 # logging.basicConfig(level=logging.INFO)
 
@@ -61,7 +71,7 @@ if __name__ == "__main__":
         # Now, we create a dictionary for netmiko library
         device_params = {
             "device_type": get_platform_by_hostname(dev),
-            "host": dev + def_domain,
+            "host": get_full_hostname(dev, def_domain),
             "username": dev_login,
             "password": dev_pwd,
             "verbose": True
@@ -85,14 +95,15 @@ if __name__ == "__main__":
             # logging.warning(f"SSH failed with {err}")
             logging.warning("SSH failed, trying Telnet")
             try:
+                def_timeout = 2
                 with telnetlib.Telnet(device_params["host"]) as tn:
                     #Logging in
-                    tn.read_until(b":",timeout=3)
+                    tn.read_until(b":",timeout=def_timeout)
                     tn.write(dev_login.encode("ascii") + b'\n')
 
-                    tn.read_until(b':', timeout=3)
+                    tn.read_until(b':', timeout=def_timeout)
                     tn.write(dev_pwd.encode("ascii") + b'\n')
-                    auth_res = tn.read_until(b'#', timeout=3)
+                    auth_res = tn.read_until(b'#', timeout=def_timeout)
                     if auth_res.decode("ascii").find(dev) == -1:
                         raise ConnectionRefusedError(f"{auth_res.decode('ascii')}")
 
@@ -101,15 +112,15 @@ if __name__ == "__main__":
                     if data[dev].get("enable"):
                         logging.info("Trying enable mode")
                         tn.write("enable".encode("ascii") + b'\n')
-                        res = tn.read_until(b'#', timeout=3)
+                        res = tn.read_until(b'#', timeout=def_timeout)
                         print(f"{res.decode('ascii')}\n")
                         tn.write(device_params["secret"].encode("ascii") + b'\n')
-                        res = tn.read_until(b'#', timeout=3)
+                        res = tn.read_until(b'#', timeout=def_timeout)
                         print(f"{res.decode('ascii')}\n")
 
                     for cmd in data[dev]["cmds"]:
                         tn.write(cmd.encode("ascii") + b'\n')
-                        res = tn.read_until(b'#', timeout=3)
+                        res = tn.read_until(b'#', timeout=def_timeout)
                         print(f"{res.decode('ascii')}\n")
             except Exception as tn_err:
                 logging.warning(f"Auth failed, received:\n{tn_err}")
