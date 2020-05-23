@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Multiple commands executor")
     parser.add_argument('-l', action="store", dest="login", default=getpass.getuser(),
-                        help="Common ligin for the network equipment")
+                        help="Common login for the network equipment")
     parser.add_argument('fname', action="store", help="File with devices and commands")
     args = parser.parse_args()
 
@@ -68,17 +68,25 @@ if __name__ == "__main__":
             dev_login = data[dev].get("login")
             dev_pwd = getpass.getpass(f"{dev_login}'s password on {dev}:")
 
+        # There might be a clearly stated platform
+        dev_platform = data[dev].get("platform") or get_platform_by_hostname(dev)
+
         # Now, we create a dictionary for netmiko library
         device_params = {
-            "device_type": get_platform_by_hostname(dev),
+            "device_type": dev_platform,
             "host": get_full_hostname(dev, def_domain),
             "username": dev_login,
             "password": dev_pwd,
             "verbose": True
         }
 
+        # In case we need to go to enable mode with specific password
         if data[dev].get("enable"):
             device_params["secret"] = getpass.getpass(f"{dev}'s enable password:")
+
+        # Check if there is a custom port
+        if data[dev].get("port"):
+            device_params["port"] = data[dev].get("port")
 
         # First try, SSH
         try:
@@ -93,10 +101,11 @@ if __name__ == "__main__":
 
         except Exception as err:
             # logging.warning(f"SSH failed with {err}")
-            logging.warning("SSH failed, trying Telnet")
+            logging.warning(f"SSH failed with {err}, trying Telnet")
             try:
                 def_timeout = 2
-                with telnetlib.Telnet(device_params["host"]) as tn:
+                dev_port = device_params.get("port") or 23
+                with telnetlib.Telnet(device_params["host"], dev_port) as tn:
                     #Logging in
                     tn.read_until(b":",timeout=def_timeout)
                     tn.write(dev_login.encode("ascii") + b'\n')
